@@ -6,7 +6,7 @@ phase: 7
 phase_name: 设计文档
 phase_count: 10
 progress_percent: 70
-repo: 无（独立目录，未初始化 git）
+repo: git@github.com:Fyl-dragon/eu-guarantee.git (main)
 ---
 
 # Project State — EU Guarantee & Warranty
@@ -36,7 +36,8 @@ repo: 无（独立目录，未初始化 git）
 - **暂不提交 PCD 申请。** 本方向只用 `write_products`，不读 Orders / Customers / DraftOrders。
 - **不修改 `../../quote-forge/` 的任何代码**（含 `app/`、`extensions/`、`prisma/`、`tests/`）。
   需要复用时，复制文件到新目录，不做原地改动。
-- **不主动推任何远程仓库**（本项目尚未初始化 git）。
+- **不主动推远程仓库**（`origin` 为 `git@github.com:Fyl-dragon/eu-guarantee.git`，`main`）；
+  提交前须征得用户同意。
 - 任何"竞品没有做 X"的表述，必须有 `../../market-research/17-competitor-teardown.md` 的截图编号支撑。
 - 产品文案禁止"保证合规"类表述（见 `../docs/PRD.md` 第 9 节）。
 
