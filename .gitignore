@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+
+# 依赖与构建产物（本项目当前只有文档，暂无）
+node_modules/
+dist/
+build/
+.react-router/
+.shopify/
+
+# 环境与密钥
+.env
+.env.*
+!.env.example
+
+# 本地数据库
+*.sqlite
+*.sqlite3
+prisma/dev.sqlite
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 日志
+*.log
