@@ -1,13 +1,19 @@
 # TECH-DESIGN — EU Guarantee & Warranty
 
-> 版本：**v1.2**（2026-10-23，前身项目研究回填 + 复用表纠错）
-> 上游：`PRD.md` v1.2、`UX-FLOWS.md` v1.0、`../../market-research/18-requirement-matrix.md` v1.1、
-> **`../../market-research/21-asset-verification.md`**（实测数据）
+> 版本：**v1.4**（2026-10-25，App Pricing、计费退款与商家支持设计）
+> 上游：`PRD.md` v1.4、`UX-FLOWS.md` v1.1、`ADMIN-PRD.md` v0.2、
+> `../../market-research/18-requirement-matrix.md` v1.3、
+> **`../../market-research/21-asset-verification.md`**（素材实测）、
+> **`../../market-research/22-legal-verification.md`**（法规原文）
 > 状态：**待评审**。本文件通过前不写功能代码。
 >
 > 本文件只回答"怎么做"，不重复"做什么"（那是 PRD）与"怎么交互"（那是 UX-FLOWS）。
 > 每个关键决策都标注了它解决的验收用例（T1–T12）。
 > 阅读路由见 `INDEX.md`，不要整读本文件。
+>
+> **v1.4 变更（2026-10-25）**：§9 改为 Shopify App Pricing + Partner API 的订阅/事件同步；
+> 新增 App 退款人工执行与复核、工单/意见反馈、私有附件与查看游标设计。
+> §2.5 为**待评审的逻辑模型**，不是已建表。Partner org 可用性、财务/附件保留仍需实测/评审。
 >
 > **v1.1 变更**：3.3 资产策略重写（不再预渲染 WebP）、3.4.1 修正"三 text = 三字段"的错误假设、
 > 3.4.2 年限上限有几何证据、新增第 11 节（折叠态用嵌套版 SVG）、
@@ -18,6 +24,10 @@
 > §4.5 扩展运行时约束（`network_access` / CORS / bundle 上限）、
 > §4.6 session token 语义三误用；§4.4 降级表扩为 6 行。
 > 修正 §1.2 复用表三处事实错误（`billing` 真实路径、`vitest.config.ts` 不存在、Playwright 未使用）。
+>
+> **v1.3 变更（法规核查）**：**删除 D-1（整数年份）** —— 法规允许半整年（`2,5`）。
+> §6.1 校验改为「半年单位 + 逗号渲染」，新增 `parseYearsToHalfUnits` / `formatYears`；
+> 数据模型 `years Int` → `yearsHalfUnits SmallInt`；§3.3 A1 字体风险升级为**法规明文要求**。
 
 ---
 
@@ -41,7 +51,7 @@
 | --------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------ |
 | Shopify 鉴权与安装流程                                    | `app/shopify.server.ts`（71 行）         | 直接沿用，改 `scopes`                            |
 | Prisma session storage                                    | `prisma/schema.prisma` 的 `Session` 模型 | 原样保留                                         |
-| Billing 封装                                              | `app/lib/billing.server.ts`              | 改为 Free/Starter/Pro 三档                       |
+| Billing 封装                                              | `app/lib/billing.server.ts`              | 仅参考套餐门禁结构；不沿用旧收费流程，按 §9 改为 Shopify App Pricing + Partner API |
 | Webhook 骨架（含 `app/uninstalled`、`app/scopes_update`） | `app/routes/webhooks.*`                  | 增加三个 GDPR webhook                            |
 | Theme App Extension 骨架                                  | `extensions/quote-forge/`                | 目录重建，但 `shopify.extension.toml` 结构可参考 |
 | Vitest 依赖                                               | `package.json` 的 `vitest` devDependency | **无独立配置文件**，测试从 `vite.config.ts` 读配置 |
@@ -51,7 +61,7 @@
 > 实际路径为 `app/lib/billing.server.ts`；vitest 只配在 `package.json` 的 scripts + devDependencies，
 > 没有独立配置文件（`vite.config.ts` 中也无 `test` 段）。复制脚手架时按本表执行。
 
-**不继承**：任何 RFQ 业务模型、`draftOrder` 相关代码、PCD 申请表。
+**不继承**：任何 RFQ 业务模型、`draftOrder` 相关代码、PCD 申请表，以及旧项目以 `billing.request` 创建收费或本地 plan 代表实际收款的假设。
 
 > 上述文件当前**仍在本地** `../../quote-forge/`（仅删了 `node_modules`，代码未删）。
 > 若将来删除该目录，可从 GitHub `Fyl-dragon/quote-forge` 的 `rfq-v1` tag 取回。
@@ -68,8 +78,9 @@ eu-guarantee/
 │   │   ├── app.garan.tsx              GARAN 列表
 │   │   ├── app.garan.$id.tsx          GARAN 编辑（唯一写入入口）
 │   │   ├── app.exclusions.tsx         排除规则
-│   │   ├── app.statement.tsx          Statement 配置（Starter+）
+│   │   ├── app.statement.tsx          Statement 配置（Growth+）
 │   │   ├── app.audit.tsx              快照 / 历史 / 导出
+│   │   ├── app.support.tsx            商家工单、App 退费与意见反馈（F11）
 │   │   ├── app.settings.tsx
 │   │   ├── s.$token.tsx               ★ 公开可打印声明页（无登录）
 │   │   ├── api.webhooks.tsx            统一 webhook 入口
@@ -145,7 +156,7 @@ model Shop {
   noticeCartDrawer  Boolean  @default(false)
   noticeDisplay     NoticeDisplay @default(FULL)   // FULL | COLLAPSED
 
-  plan              Plan     @default(FREE)         // FREE | STARTER | PRO
+  plan              Plan     @default(FREE)         // FREE | GROWTH | PRO
   trialEndsAt       DateTime?
   projectionDirty   Boolean  @default(true)
   projectionVersion Int      @default(0)
@@ -161,7 +172,7 @@ model Shop {
 }
 
 enum NoticeDisplay { FULL, COLLAPSED }
-enum Plan          { FREE, STARTER, PRO }
+enum Plan          { FREE, GROWTH, PRO }
 
 /// 每个商品的资格事实（UX-FLOWS 5.2 的"三条事实"）
 model ProductConfig {
@@ -178,7 +189,7 @@ model ProductConfig {
   // 法定前提（B0-1/2/3）
   guaranteeFreeOfCharge Boolean?
   coverage              Coverage?
-  years                 Int?
+  yearsHalfUnits        Int?                // 半年单位；3 年 = 6（`22` §2）
 
   // 标签字段（B9–B11）
   brand                 String?
@@ -202,7 +213,9 @@ model GaranLabel {
   productGid     String
   brand          String
   model          String
-  years          Int
+  /// 以「半年」为单位：3 年 = 6，2,5 年 = 5。
+  /// 用整数避免浮点误差；渲染时 formatYears() 输出逗号格式（`22` §2）
+  yearsHalfUnits Int      @db.SmallInt
   publishedAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -328,6 +341,32 @@ enum AuditKind { CONFIG_CHANGED, LABEL_ADDED, LABEL_REMOVED, EXCLUSION_CHANGED,
 **不投影商品清单**。商品级数据在 product metafield 上，
 以 `product.metafields.app.eu.garan` 直接读取 —— 这样商品数增长不会撑爆 shop metafield。
 
+### 2.5 App 计费、退款与商家支持的逻辑模型（新增，待评审）
+
+> 本节只定义需要补齐的逻辑对象，不是已经创建的 Prisma 表。需求与状态机以
+> `ADMIN-PRD.md` ADM-19–25 为唯一事实源；数据保留与删除以 `SECURITY-PCD.md` 为准。
+> 现有 `Order` / `Customer` 不增加的边界不变，App charge/Partner shop GID 不是买家订单/身份。
+
+| 逻辑对象 | 用途与最小事实 | 关键关系/约束 |
+| --- | --- | --- |
+| `AppSubscriptionSnapshot` | 当前合同、plan/handle、账期、试用、当前周期、取消/冻结（按平台可得）、观测/同步时间 | `shopId` + 平台 app/shop 引用；与本地功能 plan 分开，不从 `null` 推断已未付费 |
+| `AppBillingEvent` | 订阅历史、Charge、Earning、Credit 的分类事实、平台事件/charge 引用、金额/币种（可得时）、发生/接收时间 | Partner 组织 + app + 平台事件 ID 去重；保存白名单字段，不保存完整响应；事件不可被本地 plan 覆盖 |
+| `BillingSyncRun` | 同步窗口、回补范围、游标安全引用、结果、错误分类、开始/结束和关联 ID | 每次运行独立；支持迟到事件、重查与有限回补，不保存 token |
+| `RefundRequest` | 本店申请、charge 引用、金额/原币币种、原因、申请版本、申请/审批/外部执行引用、关联工单 | 必须绑定 `shopId`；charge 归属/余额/支付事实需核实；状态字典见 ADM-21 |
+| `RefundExecution` | 人工执行人、时间、金额/币种、平台引用、执行凭证、幂等摘要 | 只代表执行人声明；不可直接作为已退款事实；执行人与复核人不同 |
+| `RefundReview` | 复核人、复核时间、证据引用、部分/全额/失败/未知、说明 | 独立复核或可靠平台证据；支持部分退款累计与后续新退款 |
+| `SupportTicket` | 店铺、类型、主题、分类、状态、负责人、优先级、关联退款/需求 | 所有查询带 `shopId`；状态与公开进度见 ADM-23/24 |
+| `TicketMessage` | 工单、消息、作者类型/去标识引用、公开/内部可见性、正文、时间 | `PUBLIC` 与 `INTERNAL` 不同写入路径；商家响应只返回 PUBLIC |
+| `TicketResourceLink` | 工单与排障/退款/需求对象的类型、内部 ID、安全摘要 | 不复制关联正文；无权限时只显示关联存在，不可访问 |
+| `FeatureTriage` | 主需求、重复关联、内部优先级/评审备注、公开进度、真实发布里程碑 | 商家只见公开字段；合并保留原提交，不暴露他店内容 |
+| `Attachment` | 私有对象引用、店铺/工单/消息、上传主体、文件名安全处理值、声明/真实 MIME、大小、校验和、扫描状态、时间 | 不存公开永久 URL；扫描通过前不可下载；所有访问带 `shopId + attachmentId` 并鉴权 |
+| `ReadCursor` | 主体类型/去标识引用、工单/消息、最后查看时间 | 只证明查看，不代表同意、解决、通知或退款；内部备注不进入商家游标 |
+| `InternalAuditEvent` | 内部操作者、角色/权限版本、资源/店铺、动作、理由、结果、关联 ID、必要差异 | 与商家 AuditEvent 分离；不复制工单/声明/凭证正文或完整 payload |
+
+**统一要求**：这些对象都需要在后续物理设计中明确主键、租户关系、索引、不可变历史、
+删除/去标识策略和并发约束。内部后台的跨店查询走独立授权策略，不能把商家端 `shopId`
+过滤误当作内部员工自动拥有全部店铺权限。
+
 ---
 
 ## 3. Theme App Extension
@@ -412,9 +451,17 @@ assets/print/notice-{locale}.svg                    # 同一份，供打印页�
 这意味着**同一份文件既用于屏幕也用于 A4 打印**，`18` A8 自动满足，
 不需要单独的印刷版资源（原 P2 项可去掉）。
 
-> **⚠️ 必修前置项（A1）**：官方 SVG **未内嵌字体**（`@font-face` = 0，
-> `font-family: Inter-ExtraBold, Inter`）。直接分发会导致访客浏览器回退到系统
-> sans-serif，**字形与官方设计不符**，可能被视为篡改官方 artwork（违反 `18` A4 / B1）。
+> **🔴 必修前置项（A1，2026-10-23 升级为法规要求）**：官方 SVG **未内嵌字体**
+> （`@font-face` = 0，`font-family: Inter-ExtraBold, Inter`）。直接分发会导致访客
+> 浏览器回退到系统 sans-serif，**字形与官方设计不符**。
+>
+> **不再只是"可能被视为篡改"** —— 法规原文明确规定字体：
+>
+> > The font, including for the editable fields in the label, **shall be Inter**
+> > (Regular, SemiBold, and ExtraBold).
+> > — 欧委会实施指引 §3.1.2（`../../market-research/22-legal-verification.md` §5.1）
+>
+> 即：**用系统字体渲染 = 不符合法规的字体要求**。严重性从"风险"升为"合规缺陷"。
 >
 > **处理方案（M1 评审决定）**：
 >
@@ -422,7 +469,9 @@ assets/print/notice-{locale}.svg                    # 同一份，供打印页�
 >   配合内联 SVG 使用。**推荐**（保住矢量 + 可打印）。
 > - **方案 B**：构建期把固定文案的 `<text>` 转 `<path>`（需 fonttools），
 >   彻底摆脱字体依赖。更彻底但工具链更重。
-> - **方案 C**：忽略（用系统字体）。**不可接受**——等于改变官方设计。
+> - **方案 C**：忽略（用系统字体）。**不可接受**——违反法规明文要求。
+>
+> **注意**：法规要求三种字重（Regular / SemiBold / ExtraBold），subset 时三者都要带。
 >
 > 注意 `notice.zip` 的 PNG/JPG 版本不依赖字体，但**无矢量、且已知缺英语**。
 
@@ -490,7 +539,7 @@ export function renderGaranSvg(
 | ------- | ---------- | ---------------------------- |
 | `brand` | 60 字符    | 拒绝保存（不截断，避免误导） |
 | `model` | 40 字符    | 拒绝保存                     |
-| `years` | 整数，3–99 | 拒绝保存                     |
+| `yearsHalfUnits` | 整数，5–198（2.5–99 年） | 拒绝保存                     |
 
 **为什么是拒绝而不是截断**：标签上的 brand/model 是可识别的法律主体与型号，
 截断会造成错误标识。竞品把 `2.5` 直接渲染进 `XX` 位（`17` 3A.4），
@@ -732,7 +781,11 @@ Liquid 无法生成 HMAC，所以邮件路径需要：
 
 ---
 
-## 6. 校验的单一实现（P3 / D-1..D-4）
+## 6. 校验的单一实现（P3 / D-2..D-4）
+
+> **2026-10-23 重要修正**：原 D-1"年份必须为正整数"**与法规冲突，已删除**。
+> 欧委会实施指引明确允许半整年（`2,5`），但只用**逗号**且只允许 `.5`。
+> 依据：`../../market-research/22-legal-verification.md` §2。
 
 ### 6.1 `validateGaranEligibility`（纯函数）
 
@@ -741,7 +794,8 @@ Liquid 无法生成 HMAC，所以邮件路径需要：
 export type GaranInput = {
   guaranteeFreeOfCharge: boolean | null;
   coverage: "WHOLE" | "PARTIAL" | null;
-  years: number | null;
+  /** 以「半年」为单位的整数：2.5 年 = 5，3 年 = 6。避免浮点误差 */
+  yearsHalfUnits: number | null;
   brand: string | null;
   model: string | null;
 };
@@ -749,7 +803,7 @@ export type GaranInput = {
 export type RejectReason =
   | "NOT_FREE_OF_CHARGE"
   | "COVERAGE_PARTIAL"
-  | "YEARS_NOT_INTEGER"
+  | "YEARS_NOT_HALF_STEP"
   | "YEARS_NOT_GT_2"
   | "YEARS_OUT_OF_RANGE"
   | "BRAND_MISSING"
@@ -766,22 +820,55 @@ export function validateGaranEligibility(
 
 **规则**：
 
-| 检查                             | 失败原因             |
-| -------------------------------- | -------------------- |
-| `isExcluded`                     | `PRODUCT_EXCLUDED`   |
-| `guaranteeFreeOfCharge !== true` | `NOT_FREE_OF_CHARGE` |
-| `coverage !== "WHOLE"`           | `COVERAGE_PARTIAL`   |
-| `!Number.isInteger(years)`       | `YEARS_NOT_INTEGER`  |
-| `years! <= 2`                    | `YEARS_NOT_GT_2`     |
-| `years! < 3 \|\| years! > 99`    | `YEARS_OUT_OF_RANGE` |
-| `!brand`                         | `BRAND_MISSING`      |
-| `brand.length > 60`              | `BRAND_TOO_LONG`     |
-| `!model`                         | `MODEL_MISSING`      |
-| `model.length > 40`              | `MODEL_TOO_LONG`     |
+| 检查                                          | 失败原因               |
+| --------------------------------------------- | ---------------------- |
+| `isExcluded`                                  | `PRODUCT_EXCLUDED`     |
+| `guaranteeFreeOfCharge !== true`              | `NOT_FREE_OF_CHARGE`   |
+| `coverage !== "WHOLE"`                        | `COVERAGE_PARTIAL`     |
+| `!Number.isInteger(yearsHalfUnits)`           | `YEARS_NOT_HALF_STEP`  |
+| `yearsHalfUnits! <= 4`（即 ≤ 2 年）           | `YEARS_NOT_GT_2`       |
+| `yearsHalfUnits! < 5 \|\| > 198`（2.5–99 年） | `YEARS_OUT_OF_RANGE`   |
+| `!brand`                                      | `BRAND_MISSING`        |
+| `brand.length > 60`                           | `BRAND_TOO_LONG`       |
+| `!model`                                      | `MODEL_MISSING`        |
+| `model.length > 40`                            | `MODEL_TOO_LONG`       |
 
-**注意 `Number.isInteger(2.5) === false`**，所以 `2.5` 自然被拒。
-但**必须同时拒绝字符串 `"2.5"` 被 `parseInt` 成 `2` 的隐患**：
-输入层用 `Number(raw)` 而非 `parseInt(raw)`，且 `Number("2.5") = 2.5` → 被 `isInteger` 拒。
+**为什么用「半年单位」而不是 `Decimal`**：
+
+- 法规只允许 `.0` 和 `.5` 两种小数 → 值域是离散的，用整数最安全
+- 避免 `2.5` 的 IEEE754 表示误差进入数据库比较
+- 表单输入 `2,5` / `2.5` / `3` 都先归一化成 `5` / `5` / `6`
+
+**输入归一化（必须在解析层做，不在校验层）**：
+
+```ts
+// "2,5" / "2.5" / " 3 " / 2.5 → 5 / 5 / 6 / 5
+function parseYearsToHalfUnits(raw: string): number | null {
+  const s = raw.trim().replace(",", ".");
+  if (!/^\d+(\.\d+)?$/.test(s)) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  const half = n * 2;
+  return Number.isInteger(half) ? half : null;
+}
+```
+
+**关键**：
+- 输入层用 `Number()` 而非 `parseInt()`（`parseInt("2.5") === 2`，会静默截断）
+- **接受 `2.5` 和 `2,5` 两种输入**，因为商家可能用英文键盘或本地键盘
+- **渲染固定输出逗号** `2,5`（法规要求，`22` §2.1）
+
+### 6.1.1 渲染格式
+
+```ts
+/** 5 → "2,5"；6 → "6"；7 → "3,5" */
+export function formatYears(halfUnits: number): string {
+  const whole = Math.floor(halfUnits / 2);
+  return halfUnits % 2 === 0 ? String(whole) : `${whole},5`;
+}
+```
+
+**必须用逗号**（`22` §2）。这**只作为后台正确性项**，不写进 App Store 文案——用户不会为此付费。
 
 ### 6.2 所有调用点
 
@@ -806,7 +893,7 @@ export function validateSnapshotConsistency(
 | #   | 检查                                        | 对标竞品错误        |
 | --- | ------------------------------------------- | ------------------- |
 | 1   | 不存在"同时 excluded 且 labelled"的商品     | Consentico `28.png` |
-| 2   | 所有 labelled 商品的 `years` 是 3–99 的整数 | `2.5 years`         |
+| 2   | 所有 labelled 商品的 `yearsHalfUnits` 是 5–198 的整数 | 非法年数或分隔符错误 |
 | 3   | Statement 引用的商品全部存在且为 LABELLED   | —                   |
 | 4   | GARAN 数量与 `GaranLabel` 行数一致          | —                   |
 | 5   | 排除 tag 列表与 `ExclusionRule` 一致        | —                   |
@@ -912,26 +999,121 @@ notice 在页脚，通常不在首屏 → 对 LCP 无影响。
 
 ---
 
-## 9. 计费
+## 9. 计费、App 退费与支持数据边界
 
-| 档位        | Shopify Billing plan | 试用 |
-| ----------- | -------------------- | ---- |
-| Free        | 无                   | —    |
-| Starter $12 | `recurring` monthly  | 7 天 |
-| Pro $24     | `recurring` monthly  | 7 天 |
+### 9.1 套餐、定价与实现路径
 
-**门禁位置**（必须在服务端，不能只在前端隐藏）：
+| 档位              | Shopify App Pricing plan                        | 试用 |
+| ----------------- | ----------------------------------------------- | ---- |
+| Free              | 无付费订阅                                       | —    |
+| Growth $4.99      | `recurring` monthly / **annual $49**           | 7 天 |
+| Pro $9.99         | `recurring` monthly / **annual $99**           | 7 天 |
 
-| 能力                    | 检查点                                           |
-| ----------------------- | ------------------------------------------------ |
-| Statement 配置          | `app.statement.tsx` loader/action                |
-| Statement 渲染（API）   | `/api/statement`                                 |
-| 可打印页                | `/s/$token`（token 内含版本，仍需校验当前 plan） |
-| 逐变体 / 批量 CSV（P1） | 对应 action                                      |
-| 审计导出                | `app.audit.tsx` action                           |
+> v1.4 变更：`Starter $12 / Pro $24` → `Growth $4.99 / Pro $9.99`，
+> 且年付首发即上（月付/年付都支持）。理由见 `PRD` §6.4。代码里的 plan key 用
+> `free` / `growth` / `pro`，**不要沿用 `starter`**，避免与旧文档和旧订阅记录混淆。
 
-**降级行为**：从 Starter 降回 Free 时，**不删除**已配置的 Statement，
+**[设计判断] 新 public app 采用 Shopify App Pricing**：固定月付/年付属于其支持模型。
+套餐在 Partner Dashboard 配置，商家使用 Shopify 托管的 plan selection page；本项目不在代码中
+调用 `appSubscriptionCreate` 或旧框架 `billing.request` 创建新收费。官方当前路径：
+<https://shopify.dev/docs/apps/launch/billing/managed-pricing>（检索 2026-10-25）。
+
+**[待验证]** 目标 Partner organization 是否已开放 App Pricing、Partner API client 和所需权限。
+未开放时是 M5 阻塞项，不静默回退到旧 Billing 集成并宣称已经支持。App Pricing 不支持一次性购买；
+本项目只有 recurring 月/年付，不因此增加一次性收费需求。
+
+### 9.2 当前订阅与历史事件：两类事实分开
+
+| 事实 | 官方来源（当前文档） | 本项目用途 | 不能推断为 |
+| --- | --- | --- | --- |
+| 当前有效订阅 | Partner `activeSubscription(appId, shopId)`，`Manage apps` | plan/账期/试用/当前周期/pending update、功能门禁对照 | 已扣款、已支付、已到账 |
+| 订阅/安装历史 | Partner root `events`，`Manage apps` | 创建、变更、取消、冻结/解冻、安装/卸载时间线 | 实际收款或正式财务报告 |
+| Charge | `events` 的 Charge 类型 | 商家被计费的时间、类型、金额/币种、charge 引用 | 商家已支付或 Partner 已到账 |
+| Earning | `events` 的 Earning 类型 | Partner 收益/退款相关事件、对账线索 | 商家支付回执、净现金收入或法定会计记录 |
+| Credit | `events` 的 Credit 类型 | 费用抵扣申请/状态的补充事实 | 现金退款或取消订阅 |
+
+官方：
+<https://shopify.dev/docs/api/partner/active-subscription>、
+<https://shopify.dev/docs/api/partner/historical-events>。
+
+- `activeSubscription` 在无 active contract 时返回 `null`；不能单凭 `null` 区分冻结、未付费、卸载或历史合同，需要与事件/安装状态联合判断。
+- 当前 Shopify App Pricing 不依赖旧 `APP_SUBSCRIPTIONS_UPDATE` webhook：重定向后核实 Partner API；无重定向的取消/冻结/到期需主动查询/定期对账。
+- 历史事件默认最近 30 天、单页上限 250、时间窗最大 365 天；需要游标、去重、回补和缺口标记。目标组织的历史覆盖与字段可用性 `[待验证]`。
+- Partner token 属于 **Partner organization**，可访问组织内相关店铺/应用数据，不是某店 Admin token；只在服务端保存、支持轮换、不下发浏览器。`Manage apps`/`View financials` 权限按用途最小化。
+- Partner 交易信息官方限定为分析用途，不能用于正式会计或财务报告。`ADMIN-PRD` 的 MRR、付费和实际支付未知口径继续适用。
+
+### 9.3 同步与排错记录
+
+```text
+plan selection redirect / 定期对账 / 人工受控重查
+  → 查询 activeSubscription 并存当前观测
+  → 按时间窗分页读取 events
+  → 平台事件 ID 去重、保存白名单事实与引用
+  → 比较本地功能 plan、当前订阅和历史事件
+  → 标记 Stale / conflict / incomplete / unknown
+```
+
+同步运行必须有独立记录、时间窗、结果和关联 ID；重复同步不重复生成交易事实。
+API 权限不足、限流、响应错误、回补不完整或平台延迟不能显示成“无扣费”“已支付”或“已退款”。
+`AppSubscriptionSnapshot`、`AppBillingEvent`、`BillingSyncRun` 的字段边界见 §2.5。
+
+### 9.4 服务端套餐门禁（不变的原则）
+
+| 能力                    | 检查点                                           | 最低档 |
+| ----------------------- | ------------------------------------------------ | ------ |
+| Statement 配置          | `app.statement.tsx` loader/action                | **growth** |
+| Statement 渲染（API）   | `/api/statement`                                 | **growth** |
+| 可打印页                | `/s/$token`（token 内含版本，仍需校验当前 plan） | **growth** |
+| 逐变体 / 批量 CSV（P1） | 对应 action                                      | pro    |
+| 审计导出                | `app.audit.tsx` action                           | pro    |
+
+门禁由当前有效订阅与本地同步状态共同支撑，同步异常时按保守策略处理并显示 Stale；
+不把 Charge、Earning、Credit 或一次手动修改 plan 当作永久授权。商家支持 F11 不改变上述付费墙。
+
+**降级行为**：从 Growth 降回 Free 时，**不删除**已配置的 Statement，
 只是停止渲染并在后台显示"升级以继续交付"。删数据是最坏的体验。
+
+### 9.5 App 退款：申请、人工执行与独立复核
+
+**范围**：只处理商家购买 App 的费用，不是买家商品订单退款/售后索赔。
+官方当前公开路径是 **Partner Dashboard → 指定商店 → App charge Details → Issue refund**；
+支持全额/部分退款，只能退商家已经支付的费用。官方未提供本设计可假定的通用自有后台现金退款 mutation。
+
+官方：<https://shopify.dev/docs/apps/launch/billing/billing-adjustments/refund-app-charges>。
+
+```text
+商家申请（ADM-21）
+  → charge 归属、申请金额/原币币种、凭证和可退余额核实
+  → 独立 refund_approve 审批
+  → refund_execute 在 Partner Dashboard 人工退款
+  → 本地登记执行人、金额、时间、平台引用与凭证
+  → 另一授权 refund_review 复核 / 可靠平台证据核验
+  → 已核实部分 / 已核实全额 / 失败 / 未知
+  → 更新关联工单的公开进度
+```
+
+硬约束：
+
+1. 申请人与审批人分离；执行人与复核人分离；高金额阈值与双人规则由 `ADMIN-PRD` A-20 决定。
+2. 人工登记只表示执行人声明，不等于平台核验或实际到账；没有足够证据时保持待复核/未知。
+3. 重复提交、并发审批、部分退款累计、后续新退款和响应丢失必须幂等且能关联，不能重复产生有效结果。
+4. 未支付费用采用 App credit 评估，而非声称现金退款；`appCreditCreate`/订阅取消不是本流程的默认自动动作，需另行高风险授权。
+5. 超过 USD 1,000、发票超过 12 个月需 Shopify Support；ACH 付款发票通常只能在 90 天内由 App 退款，具体以官方当期规则为准。
+6. 商家不自动收到 Shopify 退款状态通知，需通过本工单的公开消息/状态跟进；本期不引入主动邮件。
+7. Partner Dashboard 深链只是人工入口，不保存密码、不模拟员工操作，不将其包装为 API 执行结果。
+
+App credit 官方：<https://shopify.dev/docs/apps/launch/billing/billing-adjustments/award-app-credits>、
+<https://shopify.dev/docs/api/partner/latest/mutations/appCreditCreate>。
+
+### 9.6 工单、附件与通知的数据边界
+
+- 商家工单使用商家 `authenticate.admin`；内部回复、审批、下载使用独立员工身份/权限，不能互换认证受众。
+- 消息以 PUBLIC/INTERNAL 分开写入与查询；内部备注、内部 triage 和员工私有字段不得进入商家响应。
+- 附件保存在受控私有对象存储，数据库只存元数据/对象引用；不使用商家 Files，不申请 `write_files`。
+- 上传必须限制真实类型、大小和数量，扫描通过前禁止下载；下载逐请求校验店铺/附件/权限并使用短时授权，危险内容不内联。
+- 商家只能访问本店公开工单、退款进度和附件；跨店 IDOR、过期 URL、降权后的访问均拒绝。
+- 本期只有公开消息、状态和必要 ReadCursor；邮件、Webhook、催办、SLA 提醒及其他主动通知为下一版本，不能成为状态推进的依赖。
+- 工单/凭证可能包含商家联系人或其他个人信息，附件安全、保留、删除与处理方要求见 `SECURITY-PCD` §3–§6。
 
 ---
 
@@ -939,13 +1121,16 @@ notice 在页脚，通常不在首屏 → 对 LCP 无影响。
 
 > **2026-10-22 更新**：D1/D2/D3 已由 `../../market-research/21-asset-verification.md` 实测解决或改写。
 > 新增 A1/A2 两项高优先级风险。
+>
+> **2026-10-23 更新**：A1 从"图形风险"升级为**法规要求**（`22` §5.1）。
+> D-1（整数年份）已删除——法规允许半整年，见 `22` §2 与本节 §6.1。
 
 | #      | 未决                                                                                              | 状态           | 结论 / 建议                                                                                                                                      |
 | ------ | ------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ~~D1~~ | ~~WebP 压缩是否导致文字模糊~~                                                                     | **已撤销**     | 不再预渲染 WebP。直接分发 gzip SVG（~60 KB）。见 3.3                                                                                             |
 | ~~D2~~ | ~~`years` 三位数是否溢出~~                                                                        | ✅ **已解决**  | 几何实测：可用 116.4 units，三位数 133.5 溢出。**上限 99**（`21` 2.5）                                                                           |
 | ~~D3~~ | ~~GARAN SVG 实际体积~~                                                                            | ✅ **已解决**  | raw 294 KB / **gzip 27 KB**，可内联（`21` 2.2）                                                                                                  |
-| **A1** | **官方 SVG 未内嵌字体，访客回退系统 sans-serif → 字形不符**                                       | 🔴 **阻塞 M3** | 三选一：① 自带 Inter WOFF2（推荐）② 构建期 text→path ③ 用 PNG 位图。**必须 M1 决定**（`21` 2.4、3.3）                                            |
+| **A1** | **官方 SVG 未内嵌字体 → 回退系统 sans-serif。法规明文要求 `shall be Inter`（三字重）**            | 🔴 **阻塞 M3** | 三选一：① 自带 Inter WOFF2 subset（推荐，需 Regular/SemiBold/ExtraBold）② 构建期 text→path ③ 不可接受用 PNG。**必须 M1 决定**（`22` §5.1、`21` 2.4） |
 | **A2** | **`Brand/Trademark` / `Model identifier` 是字段名标签，不是可替换值；brand/model 的填写位置未知** | 🔴 **阻塞 M3** | 需对比 `A2-18`（已填 `Nordlicht` / `NWT-240`）与本空白模板，确定是"替换 text"还是"叠加层"。**直接决定 `renderGaranSvg` 实现**（`21` 2.3、3.4.1） |
 | A3     | Shopify Theme App Extension 的 asset CDN 是否压缩 SVG                                             | 🟡 需实测      | 若不压缩 → 退回 WebP 混合方案（3.3）                                                                                                             |
 | A4     | Inter 字体再分发许可                                                                              | 🟢 低风险      | Inter 为 SIL OFL，允许再分发；仍需确认版本（`21` 六.3）                                                                                          |
@@ -956,9 +1141,13 @@ notice 在页脚，通常不在首屏 → 对 LCP 无影响。
 | **A5** | **`block.render` 在预认证态是否渲染？`sub` 是否为空？**                                          | 🟡 **M3 首日** | 三种结果对应三条代码路径（4.2.1）。不阻塞评审，但**必须在写 F7 的第一小时确认**                                                                  |
 | **A6** | **`network_access` capability 的声明与审核流程**                                                  | 🟡 评审        | F7 必然需要（4.5）。需确认是否额外审核、是否影响上架时间                                                                                         |
 | A7     | 扩展 bundle 体积上限的当前官方数值                                                                | 🟢 低风险      | 前身研究记录为 64 KB / full-page 128 KB，实现时复核（4.5）                                                                                       |
+| **A8** | **Partner org 是否开放 App Pricing、activeSubscription/events 与所需权限** | 🔴 **阻塞 M5** | 目标组织实测；未开放不静默回退旧 Billing，见 §9.1–9.3、`ADMIN-PRD` A-19 |
+| **A9** | **退款政策、支付/可退余额核验、审批/执行/复核人员与阈值** | 🔴 **阻塞退款开放** | 财务评审；高金额未决前不进入执行，见 §9.5、`ADMIN-PRD` A-20 |
+| **A10** | **私有附件存储/扫描/处理方、PII 隔离与财务/工单保留删除** | 🔴 **阻塞 F11 与退款凭证** | 隐私/安全联合评审，见 §2.5/§9.6、`ADMIN-PRD` A-21/A-24 |
 
 **M1 评审必须拍板的是 A1 与 A2**——它们改变 3.3 / 3.4 的实现方式，
 且在解决前 M3 无法开工（不是"优化项"，是"能否做"）。
+M5 前还必须关闭 A8（Partner 能力）；开放退款与 F11 附件前必须关闭 A9/A10。
 
 ---
 
@@ -979,5 +1168,5 @@ notice 在页脚，通常不在首屏 → 对 LCP 无影响。
 
 ---
 
-最后更新：**2026-10-23，v1.2**（前身项目研究回填 + 复用表纠错）。
-下一步：M1 评审，优先解决 A1（字体）与 A2（brand/model 写入位置）。
+最后更新：**2026-10-25，v1.4**（App Pricing/Partner 事件、App 退费、工单与私有附件设计；均为待评审设计）。
+下一步：M1 评审，优先解决 A1（字体）与 A2（brand/model 写入位置）；M5/F11 前关闭 A8–A10。

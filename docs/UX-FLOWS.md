@@ -1,9 +1,9 @@
 # UX-FLOWS — EU Guarantee & Warranty
 
-> 版本：**v1.0**（2026-10-22）
+> 版本：**v1.1**（2026-10-25，补充商家支持与 App 退费申请流程）
 > 依据：`../../market-research/18-requirement-matrix.md` v1.1（法规与用例）、
-> `../../market-research/17-competitor-teardown.md`（四家实测，73 张截图）
-> 上游：`PRD.md` v1.2
+> `../../market-research/17-competitor-teardown.md`（两轮实测，证据索引见 §三–§四及附录 A）
+> 上游：`PRD.md` v1.4、`ADMIN-PRD.md` v0.2（F11 与后台支持/退款）
 > 状态：**待评审**。本文件通过评审前不写功能代码。
 >
 > **本文件的每一个流程都必须能追溯到具体证据编号**（`17` 的章节号或 `18` 的用例号）。
@@ -42,8 +42,9 @@ EU Guarantee & Warranty
 ├── Legal notice    ← 四处位置配置（F1/F2）
 ├── GARAN labels    ← 商品标签管理（F3/F4）
 ├── Exclusions      ← 排除规则（F5）
-├── Statement       ← 商业保证声明（F7，Starter+）
+├── Statement       ← 商业保证声明（F7，Growth+）
 ├── Audit           ← 快照 / 变更 / 导出（F8）
+├── Support         ← 问题、App 退费申请与意见反馈（F11）
 └── Settings        ← 店铺信息、语言策略、卸载说明
 ```
 
@@ -56,6 +57,21 @@ EU Guarantee & Warranty
 | Pandectes   | 单页 + tabs                                                                            | 单页在功能变多后会失控                                        |
 
 `[设计判断]`：v1 不做 Plan 一级入口，改为 Settings 内的区块 + Home 的升级卡片（P5）。
+`[设计判断]`：Support 为全套餐可用的服务入口，不改变 Statement/P1 的付费墙；只显示本店公开工单和退款进度，不显示内部备注、内部优先级或其他商家的需求。
+
+## 2.3 商家支持入口与范围
+
+Support 统一处理 `QUESTION / ISSUE / BILLING / REFUND / FEATURE_REQUEST`，不拆分操作问题与需求反馈两套系统：
+
+| 类型 | 商家要完成的事 | 主要后续动作 |
+| --- | --- | --- |
+| QUESTION | 询问配置或操作问题 | 提交描述/截图 → 查看公开答复 → 解决或追问 |
+| ISSUE | 报告展示、保存、声明或同步异常 | 提供店铺内现象/时间/关联信息 → 补件 → 跟踪处理 |
+| BILLING | 询问 App 订阅、扣费或 Credit | 查看本店计费摘要 → 工单沟通 → 查看结果 |
+| REFUND | 申请 App 订阅费退费 | 关联 App charge → 填写金额/理由 → 上传凭证 → 跟踪审核与退款核验 |
+| FEATURE_REQUEST | 提出新需求并跟进 | 描述问题/期望结果 → 查看评估与公开进度 → 收到公开反馈 |
+
+**边界**：这里的退款是商家购买 App 的费用，不是买家店铺订单退款。工单、描述和附件不得用于提交买家订单号、买家身份、支付资料或完整 token；不退款到买家、不处理索赔、不提供法律意见。
 
 ### 2.2 首屏（Home）必须回答的四个问题
 
@@ -66,7 +82,7 @@ EU Guarantee & Warranty
 | 1   | **Notice 是否上线**                | `Enable the app embed`（深链到主题编辑器）                          |
 | 2   | **Notice 在哪些位置**              | `Add product block` / `Turn on cart notice`                         |
 | 3   | **GARAN 覆盖进度**                 | `Labelled 12 / Eligible 15 / Not eligible 3` + `Review remaining 3` |
-| 4   | **Statement 是否配置**（Starter+） | `Complete your guarantee statement`                                 |
+| 4   | **Statement 是否配置**（Growth+） | `Complete your guarantee statement`                                 |
 
 **第 4 行是我们的差异**：三家都没有"声明是否完成"这个状态，因为三家都没有声明。
 它是付费墙的自然入口，而不是弹窗。
@@ -218,7 +234,7 @@ Step 3/3  Preview & finish
 > 注意：Consentico 有三层变体粒度（`17` 3.2），看起来强，但它是缺陷的来源之一。
 > 我们 v1 不做，反而更少歧义。
 
-### 5.2 状态机的四个状态
+### 5.2 状态机的五个状态
 
 状态由**三个持久化事实**推导，不由勾选框决定（P1）。
 
@@ -228,24 +244,25 @@ Step 3/3  Preview & finish
 | ----------------------- | ---------------------- | --------------------- | ------------- |
 | `guaranteeFreeOfCharge` | `bool`                 | 对消费者不额外收费    | `18` B0-1     |
 | `coverage`              | `'whole' \| 'partial'` | 覆盖整机 / 仅部分部件 | `18` B0-2     |
-| `years`                 | `int`                  | 保证年数              | `18` B0-3、B9 |
+| `yearsHalfUnits`      | `int`                  | 半年单位；>2 年、整数或 `.5` | `18` B0-3、B9、`22` §2 |
 | `brand`                 | `string`               | 生产者名称            | `18` B10      |
 | `model`                 | `string`               | 型号                  | `18` B11      |
 
 **`coverage` 是单一真相**：它同时回答 PRD 开放问题 Q4（"仅覆盖部分部件如何声明"）
 与 B0-2。不需要两个开关互相矛盾。
 
-#### 四个状态
+#### 五个状态
 
 | 状态                  | 判定条件                                          | UI 表现                                  | 可执行动作           |
 | --------------------- | ------------------------------------------------- | ---------------------------------------- | -------------------- |
 | `EXCLUDED`            | 命中任一排除规则（5.3）                           | 列表内**不显示**；仅在 Exclusions 页可见 | 无（入口不渲染，P2） |
 | `NOT_REVIEWED`        | 未被排除，且 `guaranteeFreeOfCharge` 未设置       | 列表显示 `Not reviewed` 灰标             | `Review`             |
+| `NOT_ELIGIBLE`        | 已审，但不免费或 `coverage = 'partial'`           | 列表显示 `Not eligible` 灰标             | 修改前提后重审       |
 | `ELIGIBLE_UNLABELLED` | 未排除，前提满足，但 `brand`/`model`/`years` 不全 | `Qualifying · not labelled` 黄标         | `Add label`          |
 | `LABELLED`            | 未排除，前提满足，三字段完整且合法                | `Labelled · N years` 绿标                | `Edit` / `Remove`    |
 
-**没有第五个状态。** 竞品的"Labelled 但实际被排除"就是第五个状态，
-是缺陷 1 的根源（`17` 4.3）。
+**`NOT_ELIGIBLE` 是正常业务状态**，用来区分“还没审”与“已审但不合格”；它不是
+`LABELLED` 与 `EXCLUDED` 同时成立的矛盾态。后者仍必须被写入与导出校验阻止。
 
 #### 状态转换图
 
@@ -257,9 +274,10 @@ Step 3/3  Preview & finish
         ┌───────────────────────┴───────────────────────┐
         │                                               │
    [NOT_REVIEWED] ──Review──► [ELIGIBLE_UNLABELLED] ──Save──► [LABELLED]
-        ▲                          ▲                            │
-        │                          └────────Edit────────────────┘
-        └────────── Remove ────────────────────────────────────┘
+        │  ▲                          ▲                            │
+        │  │                          └────────Edit────────────────┘
+        │  └───────── Remove ──────────────────────────────────────┘
+        └──Review: 不免费 / 仅部分部件──► [NOT_ELIGIBLE]
 ```
 
 **关键规则**：
@@ -282,7 +300,9 @@ Step 3/3  Preview & finish
 | B2B        | tag ∈ `{b2b, wholesale, trade-only}`          | ✅ 开 | 是（tag 名单可增删）      |
 | 自定义 tag | 商家指定                                      | 关    | 是                        |
 | 手动       | 逐个商品                                      | —     | 是                        |
-| 仅部分部件 | `coverage === 'partial'`                      | 关    | 是（在 GARAN 弹窗内设置） |
+
+`coverage === 'partial'` **不是排除**，不进入上表；它属于 §5.2 的 `NOT_ELIGIBLE`，
+不能使用 GARAN 标签，但仍必须按适用范围展示 notice。
 
 **注意**：Pandectes 把"自动排除"做成付费项（`17` 4.4），导致免费用户最容易违规。
 **我们的排除规则全部免费**（`18` F5）。
@@ -301,7 +321,8 @@ Step 3/3  Preview & finish
 │  │   (•) The whole product                               │  │
 │  │   ( ) Only certain parts  ← 选中即不可用 GARAN         │  │
 │  │                                                       │  │
-│  │ Guarantee period (years)   [ 3 ] integer, > 2         │  │
+│  │ Guarantee period (years)   [ 3 ] whole or .5, > 2     │  │
+│  │                             e.g. 3 · 2,5 · 4,5        │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                                                             │
 │  Step 2 — Label details（仅在 Step 1 全部合法后可编辑）      │
@@ -326,8 +347,9 @@ Step 3/3  Preview & finish
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------- |
 | Step 2 在 Step 1 合法前**不可编辑**（不是只变灰，是整块 disabled）                                                                             | —                                 | E1      |
 | `coverage = partial` → 弹窗顶部出现红条 `GARAN cannot be used when coverage is partial.`，**Step 2 整块消失**                                  | —                                 | **T4**  |
-| `years` 输入 **`2` / `1` / `0` / `2.5` / `3.0` / `-1` / `abc` / 空** → `Save` 保持 disabled + 行内错误 `Must be a whole number greater than 2` | 前端 + 服务端同函数               | **T3**  |
-| `years` 用 `<input type="number" step="1" min="3">`，但**不能只靠 input 属性**：粘贴 `2.5` 必须被拒                                            | —                                 | T3      |
+| `years` 输入 **`2` / `1` / `0` / `2.1` / `4,1` / `3.0` / `-1` / `abc` / 空** → `Save` 保持 disabled + 行内错误 | 前端 + 服务端同函数               | **T3**  |
+| `years` 用 `<input type="text" inputmode="decimal">`，接受 `3` / `2,5` / `2.5`；**归一化为半年单位后校验**。不能只靠 input 属性：粘贴 `2,1` 必须被拒 | 法规允许 `.5`，见 `22` §2         | T3/T3b  |
+| 输入 `2.5` 或 `2,5` → **保存后统一显示为 `2,5`**（逗号）                                                                                       | 法规明文要求                      | T3b     |
 | `brand` / `model` 空 → `Save` disabled                                                                                                         | 必填                              | —       |
 | `brand` 超过 60 字符 / `model` 超过 40 字符 → 拒绝（防止撑破 SVG 布局）                                                                        | `[设计判断]` 具体上限待设计稿确定 | —       |
 | 保存成功后列表**同步刷新**，不做"先 toast 后请求"                                                                                              | 先 await 写入再 toast             | **T12** |
@@ -343,7 +365,8 @@ validateGaranEligibility(product, input) → Ok | Rejected(reasons[])
   1. product 是否命中排除规则 → EXCLUDED
   2. coverage === 'partial' → 拒绝
   3. guaranteeFreeOfCharge !== true → 拒绝
-  4. !Number.isInteger(years) || years <= 2 → 拒绝
+  4. yearsHalfUnits 非整数（即输入不是整数或 .5）或 <= 4（≤2 年）→ 拒绝
+     （2.5 年 = 5 个半年单位，合法；2.1 年 = 4.2，非整数 → 拒绝）
   5. brand / model 为空或超长 → 拒绝
 ```
 
@@ -387,7 +410,8 @@ Filter: [All ▾]  Search products...
 
 ┌───────────────────────────────────────────────────────────────┐
 │ The Collection Snowboard: Hydrogen                            │
-│ ffd · dsd · 2.5 years            ← 不应出现（整数校验会挡住） │
+│ ffd · dsd · 2,5 years            ← 合法（法规允许半整年）     │
+│                                   逗号渲染，非句点             │
 │                                    [Edit]  [Remove]           │
 └───────────────────────────────────────────────────────────────┘
 ```
@@ -398,12 +422,12 @@ Pandectes 把它们混成一个 `Not required`，无法区分"还没看"和"看�
 
 ---
 
-## 6. Statement：商业保证声明（F7，核心差异化）
+## 6. Statement：商业保证声明（F7，基线 + N-2 同源交付）
 
 ### 6.1 商家侧配置流程
 
 ```
-Statement（一级入口，Starter+ 才可用）
+Statement（一级入口，Growth+ 才可用）
    ↓
 Step 1  Producer identity
    · 生产者名称（默认读 shop name，可改）
@@ -507,7 +531,7 @@ Step 5  Preview & activate
 1. 若某商品在 excluded 列表 且 在 labelled 列表 → 阻止导出，提示：
    "Inconsistent state found for 1 product. Fix it before exporting."
 2. 若 statement 引用了已排除商品 → 阻止。
-3. 若 GARAN years 非整数 → 阻止（理论上不可能，作为兜底）。
+3. 若 GARAN yearsHalfUnits 非整数或 ≤ 4 → 阻止（理论上不可能，作为兜底）。
 ```
 
 > 这一条直接来自 `28.png`：Consentico 的 PDF 顶部写 `All required items in place`，
@@ -562,7 +586,7 @@ record, not legal advice. Generated <timestamp> from configuration version <n>.`
 | E4  | GARAN 列表：全部被排除       | `All your products are excluded. Gift cards and digital goods don't need a GARAN label.`       | `Review exclusions`                   |
 | E5  | 某商品合格但缺字段           | `Qualifying — add brand, model and years.`                                                     | `Add label`                           |
 | E6  | Statement 无已贴标签商品     | `You have no labelled products yet.`                                                           | `Add GARAN labels`                    |
-| E7  | Statement 未配置（Starter+） | `Your customers don't receive a guarantee statement yet.`                                      | `Set it up`                           |
+| E7  | Statement 未配置（Growth+） | `Your customers don't receive a guarantee statement yet.`                                      | `Set it up`                           |
 | E8  | Audit 无历史                 | `No changes recorded yet.`                                                                     | —（无需动作）                         |
 | E9  | 搜索无结果                   | `No products match "xyz".`                                                                     | `Clear search`                        |
 
@@ -607,7 +631,8 @@ record, not legal advice. Generated <timestamp> from configuration version <n>.`
 | ------------------------ | ----------------------------------------------------------- |
 | T1 马耳他语              | 4.4 语言策略                                                |
 | T2 CSS 无法改写 GARAN    | 5.4「内联 SVG，不提供任何 CSS 覆盖入口」                    |
-| **T3 整数年份**          | 5.4 交互细则 + 5.5 校验第 4 条                              |
+| **T3 年份格式**          | 5.4 交互细则 + 5.5 校验第 4 条                              |
+| **T3b `.5` 必须接受**    | 5.4 交互细则（`2.5`/`2,5` → 渲染 `2,5`）                    |
 | **T4 部分部件**          | 5.2 `coverage` 单一真相 + 5.4 `Step 2 整块消失`             |
 | **T4b 礼品卡/数字/B2B**  | 5.2 `EXCLUDED` 吸收态                                       |
 | **T4c 未勾免费+整机**    | 5.5 校验第 2、3 条                                          |
@@ -625,7 +650,117 @@ record, not legal advice. Generated <timestamp> from configuration version <n>.`
 
 ---
 
-## 13. 本文件明确**没有**回答的问题
+## 14. Support：工单、App 退费与意见反馈（F11）
+
+> 本节均为 `[设计判断]`，只定义商家可见交互。内部角色、状态机、审批与审计以
+> `ADMIN-PRD.md` ADM-19–25 为准；数据与安全边界见 `SECURITY-PCD.md`。
+
+### 14.1 工单列表与新建
+
+**列表默认展示**：主题、类型、公开状态、最近公开回复时间、是否有新回复、负责人（如决定公开）。
+筛选项：类型、状态、时间；无结果时保留清除筛选动作。
+
+```text
+Support
+  → [New request]
+  → 选择 Question / Issue / Billing / Refund / Feature request
+  → 填写主题、问题或期望结果、发生时间（可选）
+  → 按类型补充关联信息（如 App charge、错误关联 ID）
+  → 添加附件（可选）
+  → Submit → 显示工单号与当前公开状态
+```
+
+- 重复点击/网络重放不得生成重复工单；失败时保留已填写文本，未完成的附件可单独重试。
+- 保存成功后才显示工单号；上传完成但扫描未通过的附件不展示为可用凭证。
+- FEATURE_REQUEST 要求描述“要解决的问题/期望结果”，不能要求运营承诺交付日期。
+- ISSUE 可关联店铺内 GARAN、Statement 或同步问题；不要求、也不接受买家订单号或买家资料。
+
+### 14.2 双向回复、内部备注隔离与解决/重开
+
+```text
+工单详情
+  ├── 公开沟通：商家与运营的回复、补充资料、状态历史
+  ├── 关联事项：退款申请 / 技术排障 / 产品需求（按权限）
+  ├── 附件：扫描状态、下载、补充
+  └── 动作：Reply / Add files / Mark resolved / Reopen
+```
+
+- 商家可以回复、补充、查看公开进度、标记解决或在允许窗口内重开；重开不删除原解决记录。
+- 运营公开回复和内部备注采用不同写入动作。商家端任何接口、导出或页面均不返回内部备注、内部 triage、员工私有字段。
+- “有新回复”仅来自商家未查看的公开消息；内部备注不产生商家新回复提示。加载列表不把全部消息标为已读。
+- 不展示员工的精确在线/查看行为作为商家监控信息；“已查看”只代表查看，不代表同意、解决或退款完成。
+- 状态显示与可执行动作以 `ADMIN-PRD` ADM-23 为准。SLA、自动关闭、重开窗口未评审前，不展示响应时效承诺或自动关闭倒计时。
+
+### 14.3 App 退费申请与进度
+
+```text
+选择 Refund
+  → 选择本店 App charge 引用（不是买家订单）
+  → 填申请金额与原币币种、原因和说明
+  → 上传凭证/在关联工单沟通
+  → Submitted
+  → Needs information / In review
+  → Approved / Rejected / Cancelled
+  → Awaiting manual processing
+  → Execution recorded / Under review
+  → Verified partial / Verified full / Failed / Unknown
+```
+
+**页面必须把两条进度分开**：
+
+1. **申请处理**：提交、补件、审核、批准/拒绝/撤销。
+2. **外部退款**：等待人工办理、执行人已登记、独立复核/平台核验、部分/全额/失败/未知。
+
+- “已批准”不等于“已退款”；执行人登记也不等于平台核验或实际到账。未知状态提供“查看工单/等待复核”，不能提供手动改成成功的入口。
+- 只能为本店 App 费用申请；charge 不属于本店、币种/金额异常或超可退余额时，拒绝并说明原因。
+- 未支付费用显示 App credit 评估路径，不称为现金退款；取消订阅与退款为独立事项，不在申请时默认勾选或自动执行。
+- 超过平台退款限制时，展示转 Shopify Support 的处理指引，不承诺系统内完成。
+- 商家在关联工单查看公开结果；Shopify 不自动通知退款状态时，本流程必须更新站内公开进度。本期不发主动邮件。
+
+### 14.4 意见反馈与公开进度
+
+FEATURE_REQUEST 与普通问题共用工单、回复、附件和状态历史，额外显示：
+
+- 是否已关联到主需求（不显示其他商家的店铺或原文）。
+- 公开进度：已提交、评估中、已规划、处理中、已发布、不计划/关闭。
+- 运营公开说明与真实发布记录链接（发布后）。
+
+**不默认公开**内部成本、内部评审备注、精确排期或其他商家信息。`已规划/处理中` 不表示交付日期承诺；`已发布` 必须对应真实发布记录，而非仅人工改状态。
+
+### 14.5 附件上传与凭证安全
+
+| 步骤 | 商家看到的内容 | 允许动作 |
+| --- | --- | --- |
+| 选择文件 | 类型、大小、数量限制；遮蔽买家/支付/认证信息提示 | 选择/取消 |
+| 上传中 | 进度，可重试失败文件 | 重试/移除未提交文件 |
+| 扫描中 | `Security check in progress` | 查看元数据，不可下载 |
+| 可下载 | 扫描通过，按本店/工单权限获取短时下载 | 下载/按规则撤回 |
+| 扫描失败/感染/隔离 | 不可用原因与下一步，不伪装成功 | 删除/替换/联系支持 |
+
+- 禁止上传买家订单、订单号、姓名、邮箱、地址、支付资料、完整 token；疑似 PII 的隔离/删除流程 `[待确认]`。
+- SVG、HTML、脚本等危险内容不内联预览；下载必须重新授权，永久公开 URL 不可使用。
+- 跨店、伪造附件 ID、过期下载链接和已降权人员访问均拒绝；具体安全规则以 `ADMIN-PRD` ADM-25 为准。
+
+### 14.6 空态、错误态与通知边界
+
+新增商家空错态：
+
+| # | 场景 | 处理 |
+| --- | --- | --- |
+| E10 | 尚未提交工单 | 说明可提问、报告问题、申请 App 退费或提交需求 → `New request` |
+| E11 | 筛选无结果 | 保留筛选条件与 `Clear filters`，不误显示为无工单 |
+| E12 | 公开回复加载失败 | 保留本地未提交草稿，显示重试，不重复创建消息 |
+| E13 | 退款支付/可退余额无法核实 | 显示 `We need to verify this charge` + 补件/等待复核，不自动批准 |
+| E14 | 退款已批准但未核验 | 明确展示“申请已批准，外部退款待办理/复核”，不显示成功 |
+| E15 | 附件扫描失败或含疑似 PII | 隔离、不可下载，提供删除/替换和隐私提示 |
+| E16 | 商家尝试查看他店资源或无权限内容 | 拒绝且不泄露资源内容；提供返回本店 Support |
+| E17 | 已卸载/数据删除中 | 停止新回复/上传/退款执行，显示受限状态与后续指引 |
+
+**本期仅站内消息、公开状态与必要查看记录。** 邮件、Webhook、催办、SLA 提醒和其他主动通知是下一版本；所有流程在无主动通知时仍可完成。关闭邮件等外部渠道后，工单提交、回复、补件、退款复核和需求反馈不得被阻断。
+
+---
+
+## 15. 本文件明确**没有**回答的问题
 
 诚实边界，避免下游误以为已定：
 
@@ -637,9 +772,12 @@ record, not legal advice. Generated <timestamp> from configuration version <n>.`
 | U4  | C1 固定文案的**多语言来源**（自译还是官方文件）                   | 设计评审时定                         |
 | U5  | 商品数上限是否引入免费档                                          | V1 验证后（PRD Q7）                  |
 | U6  | `[设计判断]` 全部条目的取舍是否需要商家验证                       | V1 对话                              |
+| U7  | 工单优先级、SLA、自动关闭、重开窗口及需求公开排期                 | `ADMIN-PRD.md` A-22；Support UX 评审 |
+| U8  | 退款政策、可退余额/实际支付核验、审批阈值和部分退款展示           | `ADMIN-PRD.md` A-20；财务评审        |
+| U9  | 附件类型/大小/数量、扫描服务、疑似 PII 隔离及保留期               | `ADMIN-PRD.md` A-21；隐私评审        |
 
 ---
 
-最后更新：2026-10-22，v1.0。
-上游变更时需同步：`PRD.md`（差异化表述）、`18-requirement-matrix.md`（用例）、
-`TECH-DESIGN.md`（U1–U3）。
+最后更新：2026-10-25，v1.1。
+上游变更时需同步：`PRD.md`（差异化表述与 F11）、`18-requirement-matrix.md`（用例）、
+`TECH-DESIGN.md`（U1–U3）、`ADMIN-PRD.md`（U7–U9 与工单/退款/附件边界）。

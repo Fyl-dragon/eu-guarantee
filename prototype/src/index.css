@@ -1,0 +1,571 @@
+/* 仅用于 Polaris 之外的少量布局补丁；不覆盖 Polaris 组件样式 */
+
+body {
+  margin: 0;
+  background: #f1f1f1;
+  font-family: -apple-system, BlinkMacSystemFont, 'San Francisco', 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
+}
+
+/* 店面预览：模拟真实店铺的前台区域，与 Polaris 后台刻意区分 */
+.storefront {
+  background: #ffffff;
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.storefront-inner {
+  padding: 16px;
+}
+
+.storefront-notice-strip {
+  background: #f6f6f7;
+  border-top: 1px solid #e3e3e3;
+  padding: 12px 16px;
+}
+
+.storefront-notice-strip img {
+  display: block;
+  max-width: 100%;
+}
+
+/* GARAN 预览容器的角标，明示"非官方渲染" */
+.garan-preview-wrap {
+  position: relative;
+  display: inline-block;
+  background: #fafafa;
+  border: 1px dashed #c9cccf;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.garan-note {
+  font-size: 11px;
+  color: #6d7175;
+  margin-top: 8px;
+}
+
+/* 侧栏 */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-nav {
+  width: 232px;
+  flex: 0 0 232px;
+  background: #ebebeb;
+  border-right: 1px solid #dcdcdc;
+  padding: 12px 8px;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-brand {
+  padding: 8px 12px 16px;
+  font-weight: 650;
+  font-size: 13px;
+  color: #303030;
+  line-height: 1.4;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #303030;
+  cursor: pointer;
+  user-select: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: #e0e0e0;
+}
+
+.nav-item.active {
+  background: #ffffff;
+  font-weight: 650;
+  box-shadow: inset 3px 0 0 #008060;
+}
+
+.nav-item .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 6px;
+}
+
+.nav-section {
+  padding: 16px 12px 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #6d7175;
+}
+
+/* 徽章小工具 */
+.tone-success { color: #108043; }
+.tone-warning { color: #8a6116; }
+.tone-critical { color: #d72c0d; }
+.tone-subdued { color: #6d7175; }
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+/* 审计快照：左侧事实项、右侧实际配置与证据 */
+.audit-snapshot-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(280px, 2fr) auto;
+  gap: 20px;
+  align-items: start;
+}
+
+.audit-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8c9196;
+}
+
+.audit-status-dot.on { background: #108043; }
+.audit-status-dot.warning { background: #b98900; }
+.audit-status-dot.off { background: #8c9196; }
+
+/* 首页会员入口：沿用 Polaris 的浅色表面与边框，不使用打断式弹窗 */
+.membership-entry {
+  background: #f0f5ff;
+  border: 1px solid #d8e4f7;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.membership-star {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e0ebfb;
+}
+
+.membership-highlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.membership-highlight {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.membership-highlight svg,
+.benefit-check svg {
+  flex-shrink: 0;
+  color: #29845a;
+}
+
+.membership-highlight p {
+  margin: 0;
+  color: #4a4a4a;
+  line-height: 1.55;
+}
+
+.membership-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.membership-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.membership-plan {
+  display: flex;
+  padding: 16px;
+  border: 1px solid #d4d4d4;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.membership-plan > div {
+  width: 100%;
+}
+
+.membership-plan.current {
+  border-color: #78a992;
+  box-shadow: inset 0 0 0 1px #78a992;
+}
+
+.benefit-check {
+  display: inline-flex;
+  width: 18px;
+  flex: 0 0 18px;
+  margin-top: 1px;
+}
+
+/* GARAN 统计总览 */
+.garan-stat-grid {
+  display: grid;
+  grid-template-columns: 1.15fr repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.garan-stat-card {
+  min-width: 0;
+  min-height: 138px;
+  padding: 14px;
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  background: #fafafa;
+  color: #303030;
+  text-align: left;
+}
+
+.garan-stat-button {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.garan-stat-button:hover {
+  background: #f3f3f3;
+  border-color: #b5b5b5;
+}
+
+.garan-stat-button:focus-visible,
+.garan-status-tab:focus-visible,
+.display-switch:focus-visible {
+  outline: 2px solid #005bd3;
+  outline-offset: 2px;
+}
+
+.garan-stat-button.is-active {
+  background: #f0f7f3;
+  border-color: #68a088;
+  box-shadow: inset 0 0 0 1px #68a088;
+}
+
+.garan-stat-button.tone-warning.is-active {
+  background: #fff8e9;
+  border-color: #cc9b37;
+  box-shadow: inset 0 0 0 1px #cc9b37;
+}
+
+.garan-stat-button.tone-critical.is-active {
+  background: #fff4f1;
+  border-color: #d99a8d;
+  box-shadow: inset 0 0 0 1px #d99a8d;
+}
+
+.garan-stat-button.tone-neutral.is-active {
+  background: #f0f1f3;
+  border-color: #8a8f96;
+  box-shadow: inset 0 0 0 1px #8a8f96;
+}
+
+.garan-stat-label {
+  min-height: 20px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #616161;
+}
+
+.garan-stat-value {
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 650;
+}
+
+.garan-stat-detail {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #616161;
+}
+
+.garan-stat-action {
+  margin-top: auto;
+  font-size: 12px;
+  color: #4b6f5d;
+}
+
+.garan-coverage-card .Polaris-ProgressBar {
+  --pc-progress-bar-indicator: #29845a;
+}
+
+/* 店面展示开关：轨道、文字和 aria 同步呈现开关状态 */
+.display-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #616161;
+  cursor: pointer;
+  font: inherit;
+}
+
+.display-switch:hover {
+  background: #f1f1f1;
+}
+
+.display-switch-track {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 24px;
+  border: 1px solid #a3a3a3;
+  border-radius: 999px;
+  background: #c9c9c9;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.display-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+  transition: transform 150ms ease;
+}
+
+.display-switch.is-on .display-switch-track {
+  background: #29845a;
+  border-color: #29845a;
+}
+
+.display-switch.is-on .display-switch-thumb {
+  transform: translateX(20px);
+}
+
+.display-switch-text {
+  min-width: 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.display-switch.is-on .display-switch-text {
+  color: #1d6b46;
+}
+
+/* GARAN 列表：状态 Tab + 搜索与排序 */
+.garan-list-controls {
+  padding: 16px 16px 0;
+}
+
+.garan-status-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid #dedede;
+  scrollbar-width: thin;
+}
+
+.garan-status-tab {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 8px 12px 10px;
+  border: 0;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: #616161;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.garan-status-tab:hover {
+  background: #f4f4f4;
+  color: #303030;
+}
+
+.garan-status-tab::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  content: '';
+  background: transparent;
+}
+
+.garan-status-tab.is-active {
+  color: #1d6b46;
+  font-weight: 650;
+}
+
+.garan-status-tab.is-active::after {
+  background: #29845a;
+}
+
+.garan-tab-count {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #efefef;
+  color: #555;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+}
+
+.garan-status-tab.is-active .garan-tab-count {
+  background: #dfeee6;
+  color: #1d6b46;
+}
+
+.garan-table-tools {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(190px, 230px);
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.garan-search-field,
+.garan-sort-field {
+  min-width: 0;
+}
+
+.garan-table-panel {
+  min-width: 0;
+  border-top: 1px solid #ebebeb;
+}
+
+.garan-table-panel > .Polaris-IndexTable {
+  min-width: 0;
+}
+
+.garan-table-panel .Polaris-IndexTable__IndexTableWrapper {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.garan-table-panel .Polaris-IndexTable__Table {
+  min-width: 850px;
+}
+
+.garan-result-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 6px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebebeb;
+}
+
+.garan-empty-results {
+  display: grid;
+  place-items: center;
+  min-height: 250px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.product-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 170px;
+}
+
+.product-thumbnail {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid #e1e3e5;
+  border-radius: 6px;
+  background: #f6f6f7;
+  color: #616161;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.product-thumbnail.tone-ski { color: #446381; background: #f0f5fa; }
+.product-thumbnail.tone-gear { color: #6e5c42; background: #f9f5ed; }
+.product-thumbnail.tone-accessory { color: #426d5a; background: #f0f7f3; }
+
+@media (max-width: 1250px) {
+  .garan-stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .garan-coverage-card {
+    grid-column: 1 / -1;
+    min-height: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .membership-highlights,
+  .membership-plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .garan-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .garan-table-tools {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .garan-stat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .garan-coverage-card {
+    grid-column: 1 / -1;
+  }
+
+  .garan-list-controls {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .garan-result-summary {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+}
